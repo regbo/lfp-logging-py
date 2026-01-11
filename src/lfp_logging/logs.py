@@ -1,91 +1,61 @@
 import inspect
 import logging
-import os
 import pathlib
 import sys
 import threading
 import types
-from typing import Any, Callable, Mapping
+from typing import Any, Callable
+
+from lfp_logging import config
 
 """
 This module provides a lazy-initialization logging utility that automatically
-configures logging handlers for stdout and stderr based on environment variables
-and system arguments.
+configures logging handlers for stdout and stderr.
+
+The core design allows for "zero-config" logging that stays out of the way of
+other configuration attempts. It achieves this by patching loggers on creation:
+1. `logger()` returns a standard `logging.Logger` but patches its `isEnabledFor`
+   method.
+2. The first time a log level check occurs, `logging.basicConfig` is called
+   automatically with default handlers (INFO to stdout, others to stderr).
+3. `logging.basicConfig` is also temporarily patched; if the user calls it
+   later, it will override the default handlers (using `force=True` if necessary)
+   to ensure the user's explicit configuration always wins.
 
 It includes functionality for:
-- Automatic logger name discovery from caller frames.
+- Automatic logger name discovery from caller frames (classes, modules, filenames).
 - Separate handling for INFO messages (stdout) and other levels (stderr).
-- Flexible log level parsing from strings, integers, and environment variables.
+- Transparent lazy initialization that supports multi-threaded environments.
 """
 
-LOG_LEVEL_DEFAULT = logging.INFO
-LOG_LEVEL_ENV_NAME = "LOG_LEVEL"
-LOG_LEVEL_SYS_ARG_NAME = "--log-level"
-LOG_FORMAT_STDOUT_ENV_NAME = "LOG_FORMAT_STDOUT"
-LOG_FORMAT_STDERR_ENV_NAME = "LOG_FORMAT_STDERR"
-LOG_LEVEL_PARSE_ENVIRON_ENV_NAME = "LOG_LEVEL_PARSE_ENVIRON"
-LOG_LEVEL_PARSE_SYS_ARGS_ENV_NAME = "LOG_LEVEL_PARSE_SYS_ARGS"
-
-_LOG_FORMAT_DEFAULT = "%(asctime)s.%(msecs)03d | %(levelname)s | %(name)s:%(lineno)d - %(message)s"
-_LOG_LEVEL_NAME_NO_MATCH_PREFIX = "Level "
-_BOOL_VALUES = {False: ["false", "no", "off", "0"], True: ["true", "yes", "on", "1"]}
-_INIT_COMPLETE = False
-_INIT_LOCK = threading.Lock()
+_HANDLE_PATCH_MARKER = ("_lfp_logging_handle_patch", object())
 
 
-class LogLevel:
-    """
-    A container for logging level information, mapping a human-readable name
-     to its corresponding integer value.
-    """
+class _InitContext(threading.Event):
+    def __init__(self) -> None:
+        super().__init__()
+        self._lock = threading.Lock()
 
-    def __init__(self, name: str, level: int) -> None:
-        self.name = name
-        self.level = level
+    def call(self, fn: Callable, *args, set: bool = True) -> bool:
+        if not self.is_set():
+            with self._lock:
+                if not self.is_set():
+                    fn(*args)
+                    if set:
+                        self.set()
+                    return True
+        return False
 
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self.name!r}, level={self.level!r})"
 
-    def __str__(self) -> str:
-        return self.name
-
-
-class _LazyLogger(logging.Logger):
-    """
-    A logger subclass that delays basic configuration until the first log
-    message is handled. This ensures that logging is only configured if it is
-    actually used.
-    """
-
-    def __init__(self, name: str, level: int = logging.NOTSET) -> None:
-        super().__init__(name, level)
-        self._handler: logging.Logger | None = None
-
-    def handle(self, record: logging.LogRecord) -> None:
-        """
-        Overrides the handle method to trigger basic configuration if it
-        hasn't been run yet.
-        """
-        if self._handler is None:
-            global _INIT_COMPLETE
-            if not _INIT_COMPLETE:
-                with _INIT_LOCK:
-                    if not _INIT_COMPLETE:
-                        _logging_basic_config()
-                        _INIT_COMPLETE = True
-            handler = logging.getLogger(self.name)
-            if handler is self:
-                raise ValueError(f"Logger name registered to self:{self.name}")
-            self._handler = handler
-        self._handler.handle(record)
+_HANDLE_PATCH_CTX = _InitContext()
+_BASIC_CONFIG_PATCH_CTX = _InitContext()
+_BASIC_CONFIG_UNPATCH_CTX = _InitContext()
 
 
 def logger(*names: Any) -> logging.Logger:
     """
-    Returns a logger instance. If basic configuration has not been completed,
-    it returns a _LazyLogger instance that will trigger configuration on first
-    use. If configuration is already complete, it returns a standard
-    logging.Logger instance.
+    Returns a standard logging.Logger instance, patched to trigger lazy
+    initialization of the default logging configuration on first use.
 
     If names are provided, it attempts to use the first valid name. If no name
     is provided or none are valid, it attempts to automatically determine a
@@ -96,116 +66,125 @@ def logger(*names: Any) -> logging.Logger:
             (not None, not "__main__") will be used.
 
     Returns:
-        A logging.Logger instance (either _LazyLogger or standard Logger).
+        A logging.Logger instance patched for lazy initialization.
     """
     name: str | None = None
     if names:
         for n in names:
-            if name := _parse_logger_name(n):
+            if name := _logger_name(n):
                 break
     if not name:
-        current_module = __name__
         current_frame = inspect.currentframe()
         caller_frame = current_frame.f_back if current_frame else None
         try:
-            # Try to get class name if called from an instance method
-            name = _frame_attribute(
-                caller_frame, "f_locals", "self", "__class__", "__name__"
-            )
-            if not name:
-                # Try to get class name if called from a class method
-                name = _frame_attribute(caller_frame, "f_locals", "cls", "__name__")
-            if not name:
-                # Fallback to module name derived from filename
-                name = _parse_logger_name(
-                    _frame_attribute(caller_frame, "f_code", "co_filename")
-                )
-
+            if caller_frame:
+                if (instance := caller_frame.f_locals.get("self", None)) is not None:
+                    # noinspection PyBroadException
+                    try:
+                        name = _logger_name(instance.__class__.__name__)
+                    except Exception:
+                        pass
+                if not name:
+                    if (cls := caller_frame.f_locals.get("cls", None)) is not None:
+                        # noinspection PyBroadException
+                        try:
+                            name = _logger_name(cls.__name__)
+                        except Exception:
+                            pass
+                if not name:
+                    if (co_filename := caller_frame.f_code.co_filename) is not None:
+                        name = _logger_name(co_filename)
         finally:
             # Clean up frames to avoid reference cycles
             del current_frame
             del caller_frame
         if not name:
-            name = current_module
-    return _LazyLogger(name) if not _INIT_COMPLETE else logging.getLogger(name)
+            name = __name__
+    logger = logging.getLogger(name)
+    _HANDLE_PATCH_CTX.call(_logger_handle_patch, logger, set=False)
+    return logger
 
 
-def log_level(value: Any) -> LogLevel | None:
+def _logger_handle_patch(logger: logging.Logger):
     """
-    Converts a given value into a LogLevel object.
+    Patches a logger's isEnabledFor method to trigger basic configuration.
 
-    Args:
-        value: The value to convert. Can be an integer (e.g., 20),
-            a string (e.g., 'INFO'), or a numeric string (e.g., '20').
-
-    Returns:
-        A LogLevel instance if conversion is successful, otherwise None.
+    This is the entry point for the lazy initialization. It marks the logger
+    as patched and replaces its isEnabledFor method with a wrapper that
+    will call _logging_basic_config_patch once.
     """
-    if value is None:
-        return None
-    if isinstance(value, int):
-        level_no = value
-        level_name = logging.getLevelName(level_no)
-        # Check if the level name is valid and not just "Level X"
-        if (
-                isinstance(level_name, str)
-                and level_name
-                and not level_name.startswith(_LOG_LEVEL_NAME_NO_MATCH_PREFIX)
-        ):
-            return LogLevel(level_name, level_no)
-    else:
-        level_name = str(value)
-        if level_name:
-            level_name = level_name.upper()
-            level_no = logging.getLevelName(level_name)
-            if isinstance(level_no, int):
-                return LogLevel(level_name, level_no)
-            elif level_name.isdigit():
-                return log_level(int(level_name))
+    marker_name, marker_value = _HANDLE_PATCH_MARKER
+    if getattr(logger, marker_name, None) is marker_value:
+        return
+    setattr(logger, marker_name, marker_value)
 
-    return None
+    _orig_is_enabled_for: Callable = logger.isEnabledFor
+
+    def _is_enabled_for(self: logging.Logger, level) -> bool:
+        _BASIC_CONFIG_PATCH_CTX.call(_logging_basic_config_patch)
+        _HANDLE_PATCH_CTX.set()
+        self.isEnabledFor = _orig_is_enabled_for
+
+        return _orig_is_enabled_for(level)
+
+    logger.isEnabledFor = types.MethodType(_is_enabled_for, logger)
 
 
-def _logging_basic_config():
+def _logging_basic_config_patch():
     """
-    Initialize the logging configuration for the application.
+    Initializes default logging handlers and patches logging.basicConfig.
 
-    This function sets up handlers for both stdout (INFO only) and stderr
-    (all other levels) with specific formatting and date formats. It uses
-    the LOG_LEVEL environment variable or --log-level system argument to
-    determine the global logging level, defaulting to INFO.
+    This function is called exactly once when the first log message (or check)
+    is processed. It sets up stdout/stderr handlers and replaces
+    logging.basicConfig with a wrapper that ensures user-provided configuration
+    can override these defaults.
     """
-    date_format = "%Y-%m-%d %H:%M:%S"
-    format_stdout = os.environ.get(LOG_FORMAT_STDOUT_ENV_NAME, None) or _LOG_FORMAT_DEFAULT
-    format_stderr = os.environ.get(LOG_FORMAT_STDERR_ENV_NAME, None) or _LOG_FORMAT_DEFAULT
-    log_level = _parse_log_level_sys_args()
-    if log_level is None:
-        log_level = _parse_log_level_environ()
-    log_level_no = LOG_LEVEL_DEFAULT if log_level is None else log_level.level
+    log_level_no = config.level().level
 
-    handlers = [
-        _log_handler(
+    basic_config_handlers = [
+        _logger_handler(
             log_level_no,
             sys.stdout,
-            format_stdout,
+            config.stdout_format(),
             lambda record: record.levelno == logging.INFO,
         ),
-        _log_handler(
+        _logger_handler(
             log_level_no,
             sys.stderr,
-            format_stderr,
+            config.stderr_format(),
             lambda record: record.levelno != logging.INFO,
         ),
     ]
 
     logging.basicConfig(
         level=log_level_no,
-        datefmt=date_format,
-        handlers=handlers,
+        datefmt=config.date_format(),
+        handlers=basic_config_handlers,
     )
 
+    # ensure that all handlers added
+    for h in basic_config_handlers:
+        if h not in logging.root.handlers:
+            return
 
-def _log_handler(
+    _orig_basic_config: Callable = logging.basicConfig
+
+    def _basic_config_unpatch():
+        root = logging.root
+        for h in root.handlers[:]:
+            if h in basic_config_handlers:
+                root.removeHandler(h)
+                h.close()
+
+    def _basic_config(**kwargs):
+        _BASIC_CONFIG_UNPATCH_CTX.call(_basic_config_unpatch)
+        logging.basicConfig = _orig_basic_config
+        _orig_basic_config(**kwargs)
+
+    logging.basicConfig = _basic_config
+
+
+def _logger_handler(
         log_level_no: int,
         stream,
         log_format: str,
@@ -230,7 +209,7 @@ def _log_handler(
     return handler
 
 
-def _parse_logger_name(value: Any) -> str | None:
+def _logger_name(value: Any) -> str | None:
     """
     Parses and cleans a potential logger name.
 
@@ -245,7 +224,8 @@ def _parse_logger_name(value: Any) -> str | None:
     """
     if value is not None and "__main__" != value:
         if name := str(value):
-            if name.endswith(".py"):
+            if name.lower().endswith(".py"):
+                # noinspection PyBroadException
                 try:
                     path = pathlib.Path(name)
                 except Exception:
@@ -258,69 +238,3 @@ def _parse_logger_name(value: Any) -> str | None:
                     name = name.replace(" ", "_")
             return name
     return None
-
-
-def _parse_log_level_sys_args() -> LogLevel | None:
-    """
-    Parses the log level from system arguments if enabled.
-    """
-    if _parse_bool(os.environ.get(LOG_LEVEL_PARSE_SYS_ARGS_ENV_NAME, None)) is False:
-        return None
-    value: str | None = None
-    for idx in range(1, len(sys.argv)):
-        arg = sys.argv[idx]
-        if LOG_LEVEL_SYS_ARG_NAME == arg:
-            if idx < len(sys.argv) - 1:
-                value = sys.argv[idx + 1]
-            else:
-                value = None
-    return log_level(value)
-
-
-def _parse_log_level_environ() -> LogLevel | None:
-    """
-    Parses the log level from environment variables if enabled.
-    """
-    if _parse_bool(os.environ.get(LOG_LEVEL_PARSE_ENVIRON_ENV_NAME, None)) is False:
-        return None
-    value = os.environ.get(LOG_LEVEL_ENV_NAME, None)
-    return log_level(value)
-
-
-def _parse_bool(value: Any) -> bool | None:
-    """
-    Converts various input types to a boolean value.
-    """
-    if value is None:
-        return None
-    elif isinstance(value, bool):
-        return value
-    elif isinstance(value, int):
-        return False if value == 0 else True if value == 1 else None
-    else:
-        value = str(value)
-        if value:
-            for result, bool_values in _BOOL_VALUES.items():
-                for bool_value in bool_values:
-                    if value.casefold() == bool_value.casefold():
-                        return result
-    return None
-
-
-def _frame_attribute(frame: types.FrameType | None, *path_parts: str) -> str | None:
-    """
-    Safely retrieves a nested attribute from a frame object or a key from a dictionary.
-    """
-    value: Any = frame
-    for path_part in path_parts:
-        if value is None:
-            break
-        try:
-            if isinstance(value, Mapping):
-                value = value.get(path_part, None)
-            else:
-                value = getattr(value, path_part, None)
-        except Exception:
-            value = None
-            break
-    return value if isinstance(value, str) else None

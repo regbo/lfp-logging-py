@@ -1,16 +1,10 @@
 import logging
-import os
 import pathlib
-import subprocess
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
+from lfp_logging import log_level
+from lfp_logging.log_level import LogLevel
 from lfp_logging.logs import (
-    LogLevel,
-    _LazyLogger,
-    _parse_bool,
-    _parse_log_level_environ,
-    _parse_log_level_sys_args,
-    log_level,
     logger,
 )
 
@@ -27,57 +21,44 @@ def test_log_level_class():
 def test_log_level_parsing():
     """Test the log_level parsing function."""
     # Test valid string levels
-    info = log_level("INFO")
+    info = log_level.get("INFO")
     assert info.name == "INFO"
     assert info.level == logging.INFO
 
     # Test valid integer levels
-    debug = log_level(10)
+    debug = log_level.get(10)
     assert debug.name == "DEBUG"
     assert debug.level == logging.DEBUG
 
     # Test numeric strings
-    warning = log_level("30")
+    warning = log_level.get("30")
     assert warning.name == "WARNING"
     assert warning.level == logging.WARNING
 
     # Test custom mapping or aliases
-    warn = log_level("WARNING")
+    warn = log_level.get("WARNING")
     assert warn.name == "WARNING"
     assert warn.level == logging.WARNING
 
     # Test "warn" alias and case insensitivity
-    warn_alias = log_level("warn")
+    warn_alias = log_level.get("warn")
     assert warn_alias.level == logging.WARNING
     assert warn_alias.name == "WARN"
 
     # Test case insensitivity for other levels
-    info_case = log_level("iNfO")
+    info_case = log_level.get("iNfO")
     assert info_case.name == "INFO"
     assert info_case.level == logging.INFO
 
     # Test invalid levels
-    assert log_level("INVALID") is None
-    assert log_level(None) is None
-    assert log_level(999) is None
-
-
-def test_parse_bool():
-    """Test the _parse_bool helper function."""
-    assert _parse_bool(True) is True
-    assert _parse_bool(False) is False
-    assert _parse_bool("true") is True
-    assert _parse_bool("off") is False
-    assert _parse_bool("1") is True
-    assert _parse_bool("0") is False
-    assert _parse_bool(None) is None
-    assert _parse_bool("invalid") is None
+    assert log_level.get("INVALID", None) is None
+    assert log_level.get(None, None) is None
+    assert log_level.get(999, None) is None
 
 
 def test_logger_explicit_name():
     """Test creating a logger with an explicit name."""
     my_logger = logger("test_logger")
-    assert isinstance(my_logger, _LazyLogger)
     assert my_logger.name == "test_logger"
 
 
@@ -119,81 +100,127 @@ def test_logger_auto_name_class():
     assert my_logger.name == "SampleClass"
 
 
-@patch("lfp_logging.logs._logging_basic_config")
-def test_lazy_logger_initialization(mock_config):
-    """Test that _LazyLogger triggers configuration on first log."""
-    from lfp_logging import logs
-
-    logs._INIT_COMPLETE = False
-
-    l = _LazyLogger("test_lazy")
-    assert l._handler is None
-
-    # Mock the internal handler to avoid real logging side effects
-    with patch("logging.getLogger") as mock_get_logger:
-        mock_handler = MagicMock()
-        mock_get_logger.return_value = mock_handler
-
-        # Create a record and handle it
-        record = logging.LogRecord(
-            "test_lazy", logging.INFO, "path", 1, "msg", None, None
-        )
-        l.handle(record)
-
-        # Verify basic config was called
-        mock_config.assert_called_once()
-        # Verify it now has a handler and called its handle method
-        assert l._handler is not None
-        mock_handler.handle.assert_called_once_with(record)
-
-
 @patch("logging.basicConfig")
-@patch("os.environ.get")
-def test_logging_basic_config_call(mock_env_get, mock_basic_config):
-    """Test the internal _logging_basic_config function."""
+def test_lazy_initialization_via_patch(mock_basic_config):
+    """Test that the patching mechanism triggers basicConfig on first log check."""
+    import logging
+
     from lfp_logging import logs
 
-    # Reset the initialization state for the test
-    logs._INIT_COMPLETE = False
+    # Reset patching contexts for the test
+    logs._HANDLE_PATCH_CTX.clear()
+    logs._BASIC_CONFIG_PATCH_CTX.clear()
+    logs._BASIC_CONFIG_UNPATCH_CTX.clear()
 
-    # Mock environment variables
-    mock_env_get.side_effect = lambda key, default: {
-        "LOG_LEVEL": "DEBUG",
-        "LOG_LEVEL_PARSE_ENVIRON": "true",
-    }.get(key, default)
+    # Get a logger
+    test_logger = logger("patch_test")
 
-    logs._logging_basic_config()
+    # basicConfig should NOT have been called yet
+    assert not mock_basic_config.called
 
-    # Verify basicConfig was called with expected level
-    mock_basic_config.assert_called_once()
-    args, kwargs = mock_basic_config.call_args
-    assert kwargs["level"] == logging.DEBUG
-    assert len(kwargs["handlers"]) == 2
+    # Checking if enabled should trigger the patch
+    test_logger.isEnabledFor(logging.INFO)
 
-
-@patch("os.environ.get")
-def test_parse_log_level_environ_disabled(mock_env_get):
-    """Test that LOG_LEVEL is ignored when LOG_LEVEL_PARSE_ENVIRON is false."""
-    mock_env_get.side_effect = lambda key, default=None: {
-        "LOG_LEVEL": "DEBUG",
-        "LOG_LEVEL_PARSE_ENVIRON": "false",
-    }.get(key, default)
-
-    assert _parse_log_level_environ() is None
+    # basicConfig should have been called now
+    assert mock_basic_config.called
 
 
-@patch("os.environ.get")
-def test_parse_log_level_sys_args_disabled(mock_env_get):
-    """Test that sys args are ignored when LOG_LEVEL_PARSE_SYS_ARGS is false."""
-    mock_env_get.side_effect = lambda key, default=None: {
-        "LOG_LEVEL_PARSE_SYS_ARGS": "false",
-    }.get(key, default)
+def test_marker_not_added_after_init():
+    """Test that the patch marker is no longer added to new loggers after initialization."""
+    import logging
 
-    with patch("sys.argv", ["script.py", "--log-level", "DEBUG"]):
-        assert _parse_log_level_sys_args() is None
+    from lfp_logging import logs
+
+    # Reset patching contexts for the test
+    logs._HANDLE_PATCH_CTX.clear()
+    logs._BASIC_CONFIG_PATCH_CTX.clear()
+    logs._BASIC_CONFIG_UNPATCH_CTX.clear()
+
+    # Get a logger
+    test_logger = logger("marker_test")
+    marker_name, marker_value = logs._HANDLE_PATCH_MARKER
+
+    # Marker should be set before use
+    assert getattr(test_logger, marker_name, None) is marker_value
+
+    # Trigger initialization (sets _HANDLE_PATCH_CTX)
+    test_logger.isEnabledFor(logging.INFO)
+
+    # Subsequent loggers should NOT receive the marker because _HANDLE_PATCH_CTX is set
+    second_logger = logger("second_marker_test")
+    assert not hasattr(second_logger, marker_name)
+
+
+def test_basicConfig_override_after_log():
+    """Test that manual basicConfig overrides lazy defaults after first log."""
+    import logging
+
+    from lfp_logging import logs
+
+    # Reset patching contexts and root handlers
+    logs._HANDLE_PATCH_CTX.clear()
+    logs._BASIC_CONFIG_PATCH_CTX.clear()
+    logs._BASIC_CONFIG_UNPATCH_CTX.clear()
+
+    # Clear existing root handlers
+    for h in logging.root.handlers[:]:
+        logging.root.removeHandler(h)
+
+    test_logger = logger("override_test")
+
+    # Trigger lazy init
+    test_logger.info("First log triggers lazy config")
+
+    # Verify default handlers are present (usually 2: stdout and stderr)
+    assert len(logging.root.handlers) == 2
+
+    # Now manually call basicConfig with a different level and a single handler
+    new_handler = logging.StreamHandler()
+    logging.basicConfig(level=logging.WARNING, handlers=[new_handler], force=True)
+
+    # Verify that the new configuration has overridden the defaults
+    assert len(logging.root.handlers) == 1
+    assert logging.root.handlers[0] is new_handler
+    assert logging.root.level == logging.WARNING
+
+
+def test_no_override_if_basicConfig_called_before_log():
+    """Test that lazy defaults do NOT override basicConfig if called before first log."""
+    import logging
+
+    from lfp_logging import logs
+
+    # Reset patching contexts and root handlers
+    logs._HANDLE_PATCH_CTX.clear()
+    logs._BASIC_CONFIG_PATCH_CTX.clear()
+    logs._BASIC_CONFIG_UNPATCH_CTX.clear()
+
+    # Clear existing root handlers
+    for h in logging.root.handlers[:]:
+        logging.root.removeHandler(h)
+
+    # Manually call basicConfig first
+    pre_handler = logging.StreamHandler()
+    logging.basicConfig(level=logging.ERROR, handlers=[pre_handler])
+
+    test_logger = logger("no_override_test")
+
+    # Trigger lazy init attempt
+    test_logger.error("First log should respect existing config")
+
+    # Verify that the pre-existing configuration was preserved
+    assert len(logging.root.handlers) == 1
+    assert logging.root.handlers[0] is pre_handler
+    assert logging.root.level == logging.ERROR
 
 
 if __name__ == "__main__":
     import pytest
 
-    raise SystemExit(pytest.main())
+    raise SystemExit(
+        pytest.main([
+            __file__,
+            "-vv",
+            "-ra",
+        ])
+    )
