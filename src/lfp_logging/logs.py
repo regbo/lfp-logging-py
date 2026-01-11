@@ -30,6 +30,7 @@ It includes functionality for:
 """
 
 _HANDLE_PATCH_MARKER = ("_lfp_logging_handle_patch", object())
+_PYTHONE_FILE_EXTENSION = ".py"
 
 
 class _InitContext(threading.Event):
@@ -224,17 +225,18 @@ def _logger_name(value: Any) -> Optional[str]:
     if value is None or value == "__main__":
         return None
 
-    name = str(value)
-    if not name:
+    name = str(value) if value else None
+    if not name or name == "__main__":
         return None
 
-    if name.lower().endswith(".py"):
+    if name.lower().endswith(_PYTHONE_FILE_EXTENSION):
         with contextlib.suppress(Exception):
             path = pathlib.Path(name)
-            if stem := path.stem:
-                name = stem
-                parent = path.parent
-                if parent_name := parent.name if parent else None:
-                    name = f"{parent_name}.{name}"
-                name = name.replace(" ", "_")
+            if path_name := path.stem:
+                if parent_name := path.parent.name if path.parent else None:
+                    path_name = f"{parent_name}.{path_name}"
+                if path_name := "".join(
+                    c if c.isalnum() or c == "." else "_" for c in path_name
+                ):
+                    return path_name
     return name

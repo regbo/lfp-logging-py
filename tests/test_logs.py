@@ -73,7 +73,7 @@ def test_logger_auto_name():
 def test_file_logger_name():
     """Test automatic logger name discovery."""
     # Test discovery from a module
-    my_logger = logger(pathlib.Path(__file__).parent / "example_file.py")
+    my_logger = logger(pathlib.Path(__file__).parent / "example file.py")
     # It should be tests.test_logs because it takes stem and parent name
     assert my_logger.name == "tests.example_file"
 
@@ -216,6 +216,24 @@ def test_no_override_if_basicConfig_called_before_log():
     assert len(logging.root.handlers) == 1
     assert logging.root.handlers[0] is pre_handler
     assert logging.root.level == logging.ERROR
+
+
+def test_file_logger_name_with_spaces():
+    """Test that spaces in file paths are converted to underscores."""
+    # Test with a path object containing spaces
+    test_path = pathlib.Path("some directory/my file.py")
+    my_logger = logger(test_path)
+
+    # "some directory/my file.py" -> stem "my file", parent "some directory"
+    # -> "some directory.my file" -> "some_directory.my_file"
+    assert my_logger.name == "some_directory.my_file"
+
+
+def test_logger_with_path_object():
+    """Test that passing a Path object directly works."""
+    test_path = pathlib.Path("direct_path.py")
+    my_logger = logger(test_path)
+    assert my_logger.name == "direct_path"
 
 
 if __name__ == "__main__":
