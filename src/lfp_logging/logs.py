@@ -70,7 +70,10 @@ class _LazyLogger(logging.Logger):
                     if not _INIT_COMPLETE:
                         _logging_basic_config()
                         _INIT_COMPLETE = True
-            self._handler = logging.getLogger(self.name)
+            handler = logging.getLogger(self.name)
+            if handler is self:
+                raise ValueError(f"Logger name registered to self:{self.name}")
+            self._handler = handler
         self._handler.handle(record)
 
 
@@ -142,9 +145,9 @@ def log_level(value: Any) -> LogLevel | None:
         level_name = logging.getLevelName(level_no)
         # Check if the level name is valid and not just "Level X"
         if (
-            isinstance(level_name, str)
-            and level_name
-            and not level_name.startswith(_LOG_LEVEL_NAME_NO_MATCH_PREFIX)
+                isinstance(level_name, str)
+                and level_name
+                and not level_name.startswith(_LOG_LEVEL_NAME_NO_MATCH_PREFIX)
         ):
             return LogLevel(level_name, level_no)
     else:
@@ -202,10 +205,10 @@ def _logging_basic_config():
 
 
 def _log_handler(
-    log_level_no: int,
-    stream,
-    log_format: str,
-    filter_fn: Callable[[logging.LogRecord], bool] | None = None,
+        log_level_no: int,
+        stream,
+        log_format: str,
+        filter_fn: Callable[[logging.LogRecord], bool] | None = None,
 ) -> logging.Handler:
     """
     Creates a StreamHandler with a specific format and an optional filter.
