@@ -14,10 +14,18 @@ A simple, zero-dependency logging utility for Python that provides lazy-initiali
 
 ## Installation
 
-You can install `lfp-logging` directly from GitHub:
+You can install `lfp-logging` directly from GitHub using `pip`:
 
 ```bash
 pip install git+https://github.com/regbo/lfp-logging-py.git
+```
+
+Or add it to your `pyproject.toml` dependencies:
+
+```toml
+dependencies = [
+    "lfp_logging @ git+https://github.com/regbo/lfp-logging-py.git"
+]
 ```
 
 ## Quick Start
