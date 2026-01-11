@@ -1,4 +1,7 @@
 import logging
+import os
+import pathlib
+import subprocess
 from unittest.mock import MagicMock, patch
 
 from lfp_logging.logs import (
@@ -84,6 +87,22 @@ def test_logger_auto_name():
     my_logger = logger()
     # It should be tests.test_logs because it takes stem and parent name
     assert my_logger.name == "tests.test_logs"
+
+
+def test_file_logger_name():
+    """Test automatic logger name discovery."""
+    # Test discovery from a module
+    my_logger = logger(pathlib.Path(__file__).parent / "example_file.py")
+    # It should be tests.test_logs because it takes stem and parent name
+    assert my_logger.name == "tests.example_file"
+
+
+def test_file_logger_none_name():
+    """Test automatic logger name discovery."""
+    # Test discovery from a module
+    my_logger = logger(None, pathlib.Path(__file__).parent / "none_example.py")
+    # It should be tests.test_logs because it takes stem and parent name
+    assert my_logger.name == "tests.none_example"
 
 
 class SampleClass:
@@ -172,3 +191,9 @@ def test_parse_log_level_sys_args_disabled(mock_env_get):
 
     with patch("sys.argv", ["script.py", "--log-level", "DEBUG"]):
         assert _parse_log_level_sys_args() is None
+
+
+if __name__ == "__main__":
+    import pytest
+
+    raise SystemExit(pytest.main())

@@ -74,7 +74,7 @@ class _LazyLogger(logging.Logger):
         self._handler.handle(record)
 
 
-def logger(name: str | None = None) -> logging.Logger:
+def logger(*names: Any) -> logging.Logger:
     """
     Returns a logger instance. If basic configuration has not been completed,
     it returns a _LazyLogger instance that will trigger configuration on first
@@ -90,6 +90,11 @@ def logger(name: str | None = None) -> logging.Logger:
     Returns:
         A logging.Logger instance (either _LazyLogger or standard Logger).
     """
+    name: str | None = None
+    if names:
+        for name in names:
+            if name := _parse_logger_name(name):
+                break
     if not name:
         current_module = __name__
         current_frame = inspect.currentframe()
@@ -104,21 +109,9 @@ def logger(name: str | None = None) -> logging.Logger:
                 name = _frame_attribute(caller_frame, "f_locals", "cls", "__name__")
             if not name:
                 # Fallback to module name derived from filename
-                if co_filename := _frame_attribute(
+                name = _parse_logger_name(_frame_attribute(
                     caller_frame, "f_code", "co_filename"
-                ):
-                    try:
-                        frame_path = pathlib.Path(co_filename)
-                    except Exception:
-                        frame_path = None
-                    if frame_path:
-                        name = frame_path.stem
-                        if (
-                            parent_name := frame_path.parent.name
-                            if frame_path.parent
-                            else None
-                        ):
-                            name = parent_name + "." + name
+                ))
 
         finally:
             # Clean up frames to avoid reference cycles
@@ -147,9 +140,9 @@ def log_level(value: Any) -> LogLevel | None:
         level_name = logging.getLevelName(level_no)
         # Check if the level name is valid and not just "Level X"
         if (
-            isinstance(level_name, str)
-            and level_name
-            and not level_name.startswith(_LOG_LEVEL_NAME_NO_MATCH_PREFIX)
+                isinstance(level_name, str)
+                and level_name
+                and not level_name.startswith(_LOG_LEVEL_NAME_NO_MATCH_PREFIX)
         ):
             return LogLevel(level_name, level_no)
     else:
@@ -207,10 +200,10 @@ def _logging_basic_config():
 
 
 def _log_handler(
-    log_level_no: int,
-    stream,
-    log_format: str,
-    filter_fn: Callable[[logging.LogRecord], bool] | None = None,
+        log_level_no: int,
+        stream,
+        log_format: str,
+        filter_fn: Callable[[logging.LogRecord], bool] | None = None,
 ) -> logging.Handler:
     """
     Creates a StreamHandler with a specific format and an optional filter.
@@ -229,6 +222,24 @@ def _log_handler(
 
     handler.addFilter(_filter)
     return handler
+
+
+def _parse_logger_name(value: Any) -> str | None:
+    if value is not None and "__main__" != value:
+        if name := str(value):
+            if name.endswith(".py"):
+                try:
+                    path = pathlib.Path(name)
+                except Exception:
+                    return name
+                if stem := path.stem:
+                    name = stem
+                    parent = path.parent
+                    if parent_name := parent.name if parent else None:
+                        name = parent_name + '.' + name
+                    name = name.replace(" ", "_")
+            return name
+    return None
 
 
 def _parse_log_level_sys_args() -> LogLevel | None:
