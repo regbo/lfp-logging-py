@@ -21,9 +21,12 @@ It includes functionality for:
 LOG_LEVEL_DEFAULT = logging.INFO
 LOG_LEVEL_ENV_NAME = "LOG_LEVEL"
 LOG_LEVEL_SYS_ARG_NAME = "--log-level"
+LOG_FORMAT_STDOUT_ENV_NAME = "LOG_FORMAT_STDOUT"
+LOG_FORMAT_STDERR_ENV_NAME = "LOG_FORMAT_STDERR"
 LOG_LEVEL_PARSE_ENVIRON_ENV_NAME = "LOG_LEVEL_PARSE_ENVIRON"
 LOG_LEVEL_PARSE_SYS_ARGS_ENV_NAME = "LOG_LEVEL_PARSE_SYS_ARGS"
 
+_LOG_FORMAT_DEFAULT = "%(asctime)s.%(msecs)03d | %(levelname)s | %(name)s:%(lineno)d - %(message)s"
 _LOG_LEVEL_NAME_NO_MATCH_PREFIX = "Level "
 _BOOL_VALUES = {False: ["false", "no", "off", "0"], True: ["true", "yes", "on", "1"]}
 _INIT_COMPLETE = False
@@ -173,10 +176,8 @@ def _logging_basic_config():
     determine the global logging level, defaulting to INFO.
     """
     date_format = "%Y-%m-%d %H:%M:%S"
-    format_stdout = "%(message)s"
-    format_stderr = (
-        "%(asctime)s.%(msecs)03d | %(levelname)s | %(name)s:%(lineno)d - %(message)s"
-    )
+    format_stdout = os.environ.get(LOG_FORMAT_STDOUT_ENV_NAME, None) or _LOG_FORMAT_DEFAULT
+    format_stderr = os.environ.get(LOG_FORMAT_STDERR_ENV_NAME, None) or _LOG_FORMAT_DEFAULT
     log_level = _parse_log_level_sys_args()
     if log_level is None:
         log_level = _parse_log_level_environ()
