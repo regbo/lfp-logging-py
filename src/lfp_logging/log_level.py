@@ -59,10 +59,3 @@ def get(value: Any, default_value: str | int | None = _UNSET) -> LogLevel | None
     elif default_value is _UNSET:
         raise ValueError(f"{LogLevel.__name__} not found: {value}")
     return get(default_value)
-
-
-if "__main__" == __name__:
-    print(get(logging.INFO))
-    print(get("20"))
-    print(get("-1", None))
-    print(get("-1"))
