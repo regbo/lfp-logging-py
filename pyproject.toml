@@ -1,7 +1,14 @@
+[build-system]
+requires = ["uv_build>=0.9"]
+build-backend = "uv_build"
+
 [project]
-name = "lfp-logging-py"
+name = "lfp_logging"
 version = "0.0.1"
-description = "Add your description here"
+description = "A simple, zero-dependency lazy-initialization logging utility"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
+
+[dependency-groups]
+dev = ["pytest"]
