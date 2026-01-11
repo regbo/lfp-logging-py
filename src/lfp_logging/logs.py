@@ -81,11 +81,13 @@ def logger(*names: Any) -> logging.Logger:
     use. If configuration is already complete, it returns a standard
     logging.Logger instance.
 
-    If no name is provided, it attempts to automatically determine a suitable
-    name from the caller's stack frame.
+    If names are provided, it attempts to use the first valid name. If no name
+    is provided or none are valid, it attempts to automatically determine a
+    suitable name from the caller's stack frame.
 
     Args:
-        name: The name for the logger. If None, it will be automatically discovered.
+        *names: Potential names for the logger. The first valid name found
+            (not None, not "__main__") will be used.
 
     Returns:
         A logging.Logger instance (either _LazyLogger or standard Logger).
@@ -109,9 +111,9 @@ def logger(*names: Any) -> logging.Logger:
                 name = _frame_attribute(caller_frame, "f_locals", "cls", "__name__")
             if not name:
                 # Fallback to module name derived from filename
-                name = _parse_logger_name(_frame_attribute(
-                    caller_frame, "f_code", "co_filename"
-                ))
+                name = _parse_logger_name(
+                    _frame_attribute(caller_frame, "f_code", "co_filename")
+                )
 
         finally:
             # Clean up frames to avoid reference cycles
@@ -140,9 +142,9 @@ def log_level(value: Any) -> LogLevel | None:
         level_name = logging.getLevelName(level_no)
         # Check if the level name is valid and not just "Level X"
         if (
-                isinstance(level_name, str)
-                and level_name
-                and not level_name.startswith(_LOG_LEVEL_NAME_NO_MATCH_PREFIX)
+            isinstance(level_name, str)
+            and level_name
+            and not level_name.startswith(_LOG_LEVEL_NAME_NO_MATCH_PREFIX)
         ):
             return LogLevel(level_name, level_no)
     else:
@@ -200,10 +202,10 @@ def _logging_basic_config():
 
 
 def _log_handler(
-        log_level_no: int,
-        stream,
-        log_format: str,
-        filter_fn: Callable[[logging.LogRecord], bool] | None = None,
+    log_level_no: int,
+    stream,
+    log_format: str,
+    filter_fn: Callable[[logging.LogRecord], bool] | None = None,
 ) -> logging.Handler:
     """
     Creates a StreamHandler with a specific format and an optional filter.
@@ -225,6 +227,18 @@ def _log_handler(
 
 
 def _parse_logger_name(value: Any) -> str | None:
+    """
+    Parses and cleans a potential logger name.
+
+    It ignores "__main__", converts file paths ending in ".py" to a
+    "parent.stem" format, and replaces spaces with underscores.
+
+    Args:
+        value: The value to parse as a logger name.
+
+    Returns:
+        A cleaned string name if valid, otherwise None.
+    """
     if value is not None and "__main__" != value:
         if name := str(value):
             if name.endswith(".py"):
@@ -236,7 +250,7 @@ def _parse_logger_name(value: Any) -> str | None:
                     name = stem
                     parent = path.parent
                     if parent_name := parent.name if parent else None:
-                        name = parent_name + '.' + name
+                        name = parent_name + "." + name
                     name = name.replace(" ", "_")
             return name
     return None

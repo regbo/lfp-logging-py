@@ -42,9 +42,10 @@ class MyService:
         self.log.info("Starting task...")
         self.log.warning("Something might be wrong.")
 
-# Or specify a name explicitly
-log = logger("my_app")
-log.info("Hello World!")
+# You can specify one or more potential names. 
+# The first valid name (non-empty, not "__main__") will be used.
+log = logger(None, "__main__", "my_app")
+log.info("Hello World!") # Uses "my_app"
 ```
 
 ## Configuration
