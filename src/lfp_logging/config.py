@@ -13,9 +13,7 @@ by the user via the standard environment variable names.
 
 LOG_LEVEL_DEFAULT = logging.INFO
 LOG_FORMAT_DATE_DEFAULT = "%Y-%m-%d %H:%M:%S"
-LOG_FORMAT_DEFAULT = (
-    "%(asctime)s.%(msecs)03d | %(levelname)s | %(name)s:%(lineno)d - %(message)s"
-)
+LOG_FORMAT_DEFAULT = "%(asctime)s %(levelname)s %(name)s:%(lineno)d %(message)s"
 
 LOG_LEVEL_SYS_ARG_NAME = "--log-level"
 
