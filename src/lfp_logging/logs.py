@@ -1,10 +1,11 @@
+import contextlib
 import inspect
 import logging
 import pathlib
 import sys
 import threading
 import types
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from lfp_logging import config
 
@@ -68,7 +69,7 @@ def logger(*names: Any) -> logging.Logger:
     Returns:
         A logging.Logger instance patched for lazy initialization.
     """
-    name: str | None = None
+    name: Optional[str] = None
     if names:
         for n in names:
             if name := _logger_name(n):
@@ -79,33 +80,31 @@ def logger(*names: Any) -> logging.Logger:
         try:
             if caller_frame:
                 if (instance := caller_frame.f_locals.get("self", None)) is not None:
-                    # noinspection PyBroadException
-                    try:
+                    with contextlib.suppress(Exception):
                         name = _logger_name(instance.__class__.__name__)
-                    except Exception:
-                        pass
-                if not name:
-                    if (cls := caller_frame.f_locals.get("cls", None)) is not None:
-                        # noinspection PyBroadException
-                        try:
-                            name = _logger_name(cls.__name__)
-                        except Exception:
-                            pass
-                if not name:
-                    if (co_filename := caller_frame.f_code.co_filename) is not None:
-                        name = _logger_name(co_filename)
+                if (
+                    not name
+                    and (cls := caller_frame.f_locals.get("cls", None)) is not None
+                ):
+                    with contextlib.suppress(Exception):
+                        name = _logger_name(cls.__name__)
+                if (
+                    not name
+                    and (co_filename := caller_frame.f_code.co_filename) is not None
+                ):
+                    name = _logger_name(co_filename)
         finally:
             # Clean up frames to avoid reference cycles
             del current_frame
             del caller_frame
         if not name:
             name = __name__
-    logger = logging.getLogger(name)
-    _HANDLE_PATCH_CTX.call(_logger_handle_patch, logger, set=False)
-    return logger
+    logger_obj = logging.getLogger(name)
+    _HANDLE_PATCH_CTX.call(_logger_handle_patch, logger_obj, set=False)
+    return logger_obj
 
 
-def _logger_handle_patch(logger: logging.Logger):
+def _logger_handle_patch(logger_obj: logging.Logger):
     """
     Patches a logger's isEnabledFor method to trigger basic configuration.
 
@@ -114,11 +113,11 @@ def _logger_handle_patch(logger: logging.Logger):
     will call _logging_basic_config_patch once.
     """
     marker_name, marker_value = _HANDLE_PATCH_MARKER
-    if getattr(logger, marker_name, None) is marker_value:
+    if getattr(logger_obj, marker_name, None) is marker_value:
         return
-    setattr(logger, marker_name, marker_value)
+    setattr(logger_obj, marker_name, marker_value)
 
-    _orig_is_enabled_for: Callable = logger.isEnabledFor
+    _orig_is_enabled_for: Callable = logger_obj.isEnabledFor
 
     def _is_enabled_for(self: logging.Logger, level) -> bool:
         _BASIC_CONFIG_PATCH_CTX.call(_logging_basic_config_patch)
@@ -127,7 +126,7 @@ def _logger_handle_patch(logger: logging.Logger):
 
         return _orig_is_enabled_for(level)
 
-    logger.isEnabledFor = types.MethodType(_is_enabled_for, logger)
+    logger_obj.isEnabledFor = types.MethodType(_is_enabled_for, logger_obj)
 
 
 def _logging_basic_config_patch():
@@ -185,10 +184,10 @@ def _logging_basic_config_patch():
 
 
 def _logger_handler(
-        log_level_no: int,
-        stream,
-        log_format: str,
-        filter_fn: Callable[[logging.LogRecord], bool] | None = None,
+    log_level_no: int,
+    stream,
+    log_format: str,
+    filter_fn: Optional[Callable[[logging.LogRecord], bool]] = None,
 ) -> logging.Handler:
     """
     Creates a StreamHandler with a specific format and an optional filter.
@@ -209,7 +208,7 @@ def _logger_handler(
     return handler
 
 
-def _logger_name(value: Any) -> str | None:
+def _logger_name(value: Any) -> Optional[str]:
     """
     Parses and cleans a potential logger name.
 
@@ -222,19 +221,20 @@ def _logger_name(value: Any) -> str | None:
     Returns:
         A cleaned string name if valid, otherwise None.
     """
-    if value is not None and "__main__" != value:
-        if name := str(value):
-            if name.lower().endswith(".py"):
-                # noinspection PyBroadException
-                try:
-                    path = pathlib.Path(name)
-                except Exception:
-                    return name
-                if stem := path.stem:
-                    name = stem
-                    parent = path.parent
-                    if parent_name := parent.name if parent else None:
-                        name = parent_name + "." + name
-                    name = name.replace(" ", "_")
-            return name
-    return None
+    if value is None or value == "__main__":
+        return None
+
+    name = str(value)
+    if not name:
+        return None
+
+    if name.lower().endswith(".py"):
+        with contextlib.suppress(Exception):
+            path = pathlib.Path(name)
+            if stem := path.stem:
+                name = stem
+                parent = path.parent
+                if parent_name := parent.name if parent else None:
+                    name = f"{parent_name}.{name}"
+                name = name.replace(" ", "_")
+    return name

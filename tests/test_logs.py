@@ -126,7 +126,9 @@ def test_lazy_initialization_via_patch(mock_basic_config):
 
 
 def test_marker_not_added_after_init():
-    """Test that the patch marker is no longer added to new loggers after initialization."""
+    """
+    Test that the patch marker is no longer added to new loggers after initialization.
+    """
     import logging
 
     from lfp_logging import logs
@@ -185,7 +187,9 @@ def test_basicConfig_override_after_log():
 
 
 def test_no_override_if_basicConfig_called_before_log():
-    """Test that lazy defaults do NOT override basicConfig if called before first log."""
+    """
+    Test that lazy defaults do NOT override basicConfig if called before first log.
+    """
     import logging
 
     from lfp_logging import logs
@@ -217,10 +221,4 @@ def test_no_override_if_basicConfig_called_before_log():
 if __name__ == "__main__":
     import pytest
 
-    raise SystemExit(
-        pytest.main([
-            __file__,
-            "-vv",
-            "-ra",
-        ])
-    )
+    raise SystemExit(pytest.main([__file__, "-vv", "-ra"]))

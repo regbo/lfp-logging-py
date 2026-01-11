@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+# Run Ruff check and auto-fix fixable issues
+uv run ruff check . --fix
+
+# Run Ruff format
+uv run ruff format .
+
+# Stage any changes made by ruff so they land in THIS commit
+git add -A
+
+# Optional: tell the user what was staged
+if ! git diff --quiet --cached; then
+  echo "pre-commit: applied pre-commit checks."
+fi

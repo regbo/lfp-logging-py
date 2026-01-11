@@ -5,12 +5,13 @@ A simple, zero-dependency logging utility for Python that provides lazy-initiali
 ## Features
 
 - **Zero Dependencies**: Built entirely on the Python standard library.
-- **Lazy Initialization**: Logging is only configured when the first log message is actually handled. Subsequent calls to `logger()` after initialization return standard `logging.Logger` instances.
-- **Automatic Name Discovery**: Automatically determines logger names based on the caller's class or module.
+- **Lazy Initialization**: Logging is only configured when the first log message is actually handled. It uses a patching mechanism that stays out of the way until a log is emitted.
+- **Automatic Name Discovery**: Automatically determines logger names based on the caller's class, module, or file name.
 - **Smart Default Handlers**:
   - `INFO` messages are sent to `stdout` for clean output.
-  - All other levels (`DEBUG`, `WARNING`, `ERROR`, `CRITICAL`) are sent to `stderr` with detailed formatting including timestamps, levels, and line numbers.
-- **Flexible Configuration**: Supports log level configuration via environment variables or system arguments.
+  - All other levels (`DEBUG`, `WARNING`, `ERROR`, `CRITICAL`) are sent to `stderr` with detailed formatting.
+- **Explicit Override Support**: If you call `logging.basicConfig()` yourself, `lfp-logging` will automatically back off and let your configuration take priority.
+- **Flexible Configuration**: Supports configuration via environment variables or system arguments.
 
 ## Installation
 
@@ -50,17 +51,18 @@ log.info("Hello World!") # Uses "my_app"
 
 ## Configuration
 
-The logging level can be controlled using environment variables or command-line arguments.
+The logging level and formats can be controlled using environment variables or command-line arguments.
 
 ### Environment Variables
 
-- `LOG_LEVEL`: Set the global log level. Accepts names (e.g., `DEBUG`, `INFO`) or numeric values (e.g., `10` for DEBUG, `20` for INFO).
-- `LOG_LEVEL_PARSE_ENVIRON`: Set to `false` to disable parsing the `LOG_LEVEL` environment variable.
+- `LOG_LEVEL`: Set the global log level. Accepts names (e.g., `DEBUG`, `INFO`) or numeric values (e.g., `10`, `20`).
+- `LOG_FORMAT_DATE`: Custom date format (default: `%Y-%m-%d %H:%M:%S`).
+- `LOG_FORMAT_STDOUT`: Custom format for stdout (INFO messages).
+- `LOG_FORMAT_STDERR`: Custom format for stderr (all other messages).
 
 ### System Arguments
 
-- `--log-level`: Set the log level via command line. Accepts names (e.g., `DEBUG`) or numeric values (e.g., `10`). Example: `python app.py --log-level 10`.
-- `LOG_LEVEL_PARSE_SYS_ARGS`: Set this environment variable to `false` to disable parsing system arguments.
+- `--log-level`: Set the log level via command line (e.g., `python app.py --log-level 10`). This takes precedence over environment variables.
 
 ## Development
 

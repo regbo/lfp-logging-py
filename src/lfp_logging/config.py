@@ -33,11 +33,8 @@ def level() -> LogLevel:
     value = os.environ.get(LOG_LEVEL_ENV_NAME, None)
     for idx in range(1, len(sys.argv)):
         arg = sys.argv[idx]
-        if LOG_LEVEL_SYS_ARG_NAME == arg:
-            if idx < len(sys.argv) - 1:
-                value = sys.argv[idx + 1]
-            else:
-                value = None
+        if arg == LOG_LEVEL_SYS_ARG_NAME:
+            value = sys.argv[idx + 1] if idx < len(sys.argv) - 1 else None
     return log_level.get(value, LOG_LEVEL_DEFAULT)
 
 
