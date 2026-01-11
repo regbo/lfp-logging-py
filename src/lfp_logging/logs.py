@@ -97,8 +97,8 @@ def logger(*names: Any) -> logging.Logger:
     """
     name: str | None = None
     if names:
-        for name in names:
-            if name := _parse_logger_name(name):
+        for n in names:
+            if name := _parse_logger_name(n):
                 break
     if not name:
         current_module = __name__
