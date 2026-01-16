@@ -32,7 +32,7 @@ dependencies = [
 ## Quick Start
 
 ```python
-from lfp_logging import logger
+from lfp_logging.logs import logger
 
 # The logger name is automatically discovered as the class name "MyService"
 class MyService:
