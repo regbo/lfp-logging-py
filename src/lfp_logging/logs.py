@@ -30,7 +30,7 @@ It includes functionality for:
 """
 
 _HANDLE_PATCH_MARKER = ("_lfp_logging_handle_patch", object())
-_PYTHONE_FILE_EXTENSION = ".py"
+_PYTHON_FILE_EXTENSION = ".py"
 
 
 class _InitContext(threading.Event):
@@ -101,7 +101,10 @@ def logger(*names: Any) -> logging.Logger:
         if not name:
             name = __name__
     logger_obj = logging.getLogger(name)
-    _HANDLE_PATCH_CTX.call(_logger_handle_patch, logger_obj, set=False)
+    if config.lazy_config():
+        _HANDLE_PATCH_CTX.call(_logger_handle_patch, logger_obj, set=False)
+    else:
+        _BASIC_CONFIG_PATCH_CTX.call(_logging_basic_config_patch)
     return logger_obj
 
 
@@ -229,7 +232,7 @@ def _logger_name(value: Any) -> Optional[str]:
     if not name or name == "__main__":
         return None
 
-    if name.lower().endswith(_PYTHONE_FILE_EXTENSION):
+    if name.lower().endswith(_PYTHON_FILE_EXTENSION):
         with contextlib.suppress(Exception):
             path = pathlib.Path(name)
             if path_name := path.stem:

@@ -32,7 +32,7 @@ dependencies = [
 ## Quick Start
 
 ```python
-from lfp_logging.logs import logger
+from lfp_logging import logger
 
 # The logger name is automatically discovered as the class name "MyService"
 class MyService:
@@ -59,6 +59,7 @@ The logging level and formats can be controlled using environment variables or c
 - `LOG_FORMAT_DATE`: Custom date format (default: `%Y-%m-%d %H:%M:%S`).
 - `LOG_FORMAT_STDOUT`: Custom format for stdout (INFO messages).
 - `LOG_FORMAT_STDERR`: Custom format for stderr (all other messages).
+- `LOG_CONFIG_LAZY`: Defer logging configuration until the first log message is emitted (default: `false`). Set to `true`, `1`, `yes`, or `on` to enable.
 
 ### System Arguments
 

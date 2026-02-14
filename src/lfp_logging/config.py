@@ -18,6 +18,7 @@ LOG_LEVEL_ENV_NAME = "LOG_LEVEL"
 LOG_FORMAT_DATE_ENV_NAME = "LOG_FORMAT_DATE"
 LOG_FORMAT_STDOUT_ENV_NAME = "LOG_FORMAT_STDOUT"
 LOG_FORMAT_STDERR_ENV_NAME = "LOG_FORMAT_STDERR"
+LOG_CONFIG_LAZY_ENV_NAME = "LOG_CONFIG_LAZY"
 
 
 def level() -> LogLevel:
@@ -41,3 +42,9 @@ def stdout_format():
 def stderr_format():
     """Returns the log format string for stderr (non-INFO levels)."""
     return os.environ.get(LOG_FORMAT_STDERR_ENV_NAME, None) or LOG_FORMAT_DEFAULT
+
+
+def lazy_config():
+    """Returns whether logging configuration should be deferred until first log."""
+    value = os.environ.get(LOG_CONFIG_LAZY_ENV_NAME, None)
+    return value is not None and value.lower() in ("true", "1", "yes", "on")
