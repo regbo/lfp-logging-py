@@ -1,11 +1,13 @@
 #!/bin/sh
 set -e
 
+# Run Ruff format
+uv run ruff format .
+
 # Run Ruff check and auto-fix fixable issues
 uv run ruff check . --fix
 
-# Run Ruff format
-uv run ruff format .
+
 
 #Run tests
 uv run pytest

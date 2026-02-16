@@ -83,17 +83,15 @@ def _supports_color(stream: IO) -> bool:
     except Exception:
         pass
     if not isatty:
-        # VSCode + Cursor
-        if _env_value("TERM_PROGRAM") == "vscode":
-            return True
+        for k, v in {
+            "TERM_PROGRAM": "vscode",
+            "PYCHARM_HOSTED": "1",
+            "CODESPACES": "true",
+        }.items():
+            if _env_value(k) == v:
+                return True
 
-        # JetBrains IDEs (PyCharm, IntelliJ)
-        if _env_value("PYCHARM_HOSTED") == "1":
-            return True
-
-        # Codespaces / remote devcontainers
-        if _env_value("CODESPACES") == "true":
-            return True
+        return False
 
     return _os_supports_color()
 
