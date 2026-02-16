@@ -179,8 +179,8 @@ def test_basicConfig_override_after_log():
     # Trigger lazy init
     test_logger.info("First log triggers lazy config")
 
-    # Verify default handlers are present (usually 2: stdout and stderr)
-    assert len(logging.root.handlers) == 2
+    # Verify default handler is present (now only 1: stderr)
+    assert len(logging.root.handlers) == 1
 
     # Now manually call basicConfig with a different level and a single handler
     new_handler = logging.StreamHandler()
@@ -242,7 +242,7 @@ def test_lazy_init_vs_standard_logging_info():
 
     my_log = logger("lazy_success")
     my_log.info("This should trigger our lazy config")
-    assert len(logging.root.handlers) == 2  # Our stdout and stderr handlers
+    assert len(logging.root.handlers) == 1  # Our single stderr handler
 
     # 2. Test back-off when standard logging.info() is used first
     logs._HANDLE_PATCH_CTX.clear()

@@ -5,27 +5,27 @@ import pathlib
 import sys
 import threading
 import types
-from typing import Any, Callable, Optional
+from typing import IO, Any, Callable, Optional
 
 from lfp_logging import config
 
 """
 This module provides a lazy-initialization logging utility that automatically
-configures logging handlers for stdout and stderr.
+configures logging handlers with ANSI color support.
 
 The core design allows for "zero-config" logging that stays out of the way of
 other configuration attempts. It achieves this by patching loggers on creation:
 1. `logger()` returns a standard `logging.Logger` but patches its `isEnabledFor`
    method.
 2. The first time a log level check occurs, `logging.basicConfig` is called
-   automatically with default handlers (INFO to stdout, others to stderr).
+   automatically with a default handler (stderr) and a custom color formatter.
 3. `logging.basicConfig` is also temporarily patched; if the user calls it
-   later, it will override the default handlers (using `force=True` if necessary)
-   to ensure the user's explicit configuration always wins.
+   later, it will remove the default handler to ensure the user's explicit
+   configuration always wins.
 
 It includes functionality for:
 - Automatic logger name discovery from caller frames (classes, modules, filenames).
-- Separate handling for INFO messages (stdout) and other levels (stderr).
+- ANSI color support for terminals and IDEs (VSCode, PyCharm, etc.).
 - Transparent lazy initialization that supports multi-threaded environments.
 """
 
@@ -52,6 +52,24 @@ class _InitContext(threading.Event):
 _HANDLE_PATCH_CTX = _InitContext()
 _BASIC_CONFIG_PATCH_CTX = _InitContext()
 _BASIC_CONFIG_UNPATCH_CTX = _InitContext()
+
+
+class _Formatter(logging.Formatter):
+    """
+    Custom logging formatter that adds ANSI color codes to log messages
+    based on the log level and terminal support.
+    """
+
+    def __init__(self, stream: IO):
+        super().__init__(config.LOG_FORMAT.get(), config.LOG_FORMAT_DATE.get())
+        self.stream = stream
+
+    def format(self, record: logging.LogRecord) -> str:
+        message = super().format(record)
+        color = config.color(self.stream, record)
+        if color is None:
+            return message
+        return f"{color}{message}" + "\x1b[0m"
 
 
 def logger(*names: Any) -> logging.Logger:
@@ -101,7 +119,7 @@ def logger(*names: Any) -> logging.Logger:
         if not name:
             name = __name__
     logger_obj = logging.getLogger(name)
-    if config.lazy_config():
+    if config.LOG_CONFIG_LAZY.get():
         _HANDLE_PATCH_CTX.call(_logger_handle_patch, logger_obj, set=False)
     else:
         _BASIC_CONFIG_PATCH_CTX.call(_logging_basic_config_patch)
@@ -142,40 +160,24 @@ def _logging_basic_config_patch():
     logging.basicConfig with a wrapper that ensures user-provided configuration
     can override these defaults.
     """
-    log_level_no = config.level().level
-
-    basic_config_handlers = [
-        _logger_handler(
-            log_level_no,
-            sys.stdout,
-            config.stdout_format(),
-            lambda record: record.levelno == logging.INFO,
-        ),
-        _logger_handler(
-            log_level_no,
-            sys.stderr,
-            config.stderr_format(),
-            lambda record: record.levelno != logging.INFO,
-        ),
-    ]
+    log_level_no = config.LOG_LEVEL.get().level
+    handler = _create_logging_handler()
 
     logging.basicConfig(
         level=log_level_no,
-        datefmt=config.date_format(),
-        handlers=basic_config_handlers,
+        handlers=[handler],
     )
 
     # ensure that all handlers added
-    for h in basic_config_handlers:
-        if h not in logging.root.handlers:
-            return
+    if handler not in logging.root.handlers:
+        return
 
     _orig_basic_config: Callable = logging.basicConfig
 
     def _basic_config_unpatch():
         root = logging.root
         for h in root.handlers[:]:
-            if h in basic_config_handlers:
+            if h is handler:
                 root.removeHandler(h)
                 h.close()
 
@@ -187,28 +189,13 @@ def _logging_basic_config_patch():
     logging.basicConfig = _basic_config
 
 
-def _logger_handler(
-    log_level_no: int,
-    stream,
-    log_format: str,
-    filter_fn: Optional[Callable[[logging.LogRecord], bool]] = None,
-) -> logging.Handler:
+def _create_logging_handler() -> logging.Handler:
     """
-    Creates a StreamHandler with a specific format and an optional filter.
+    Creates the default StreamHandler (stderr) with the custom color formatter.
     """
-    handler = logging.StreamHandler(stream)  # type: ignore[arg-type]
-    handler.setFormatter(logging.Formatter(log_format))
-
-    def _filter(record: logging.LogRecord) -> bool:
-        """
-        Filters records based on level and an optional custom filter function.
-        """
-        if record.levelno >= log_level_no:
-            return True if filter_fn is None else filter_fn(record)
-        else:
-            return False
-
-    handler.addFilter(_filter)
+    stream = sys.stderr
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(_Formatter(stream))
     return handler
 
 

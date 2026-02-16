@@ -43,7 +43,9 @@ def get(
         A LogLevel instance if conversion is successful.
     """
     if value is not None:
-        if isinstance(value, int):
+        if isinstance(value, logging.LogRecord):
+            return get(value.levelno, default_value)
+        elif isinstance(value, int):
             level_no = value
             level_name = logging.getLevelName(level_no)
             if (
