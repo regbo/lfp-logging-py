@@ -4,7 +4,6 @@ A simple, zero-dependency logging utility for Python that provides lazy-initiali
 
 ## Features
 
-- **Zero Dependencies**: Built entirely on the Python standard library.
 - **Lazy Initialization**: Logging is only configured when the first log message is actually handled. It uses a patching mechanism that stays out of the way until a log is emitted.
 - **Automatic Name Discovery**: Automatically determines logger names based on the caller's class, module, or file name.
 - **Smart Default Handlers**:
