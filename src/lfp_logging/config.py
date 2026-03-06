@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from functools import cache
 from typing import IO, Any, Callable, Optional
 
+from lfp_types import to_bool
+
 from lfp_logging import log_level
 
 """
@@ -31,7 +33,7 @@ class _Config:
 
 
 LOG_LEVEL = _Config("LOG_LEVEL", lambda v: log_level.get(v, logging.INFO))
-LOG_CONFIG_LAZY = _Config("LOG_CONFIG_LAZY", lambda v: _parse_bool(v))
+LOG_CONFIG_LAZY = _Config("LOG_CONFIG_LAZY", lambda v: to_bool(v))
 LOG_FORMAT = _Config(
     "LOG_FORMAT",
     lambda v: v or "%(asctime)s %(levelname)s %(name)s:%(lineno)d %(message)s",
@@ -135,14 +137,3 @@ def _env_value(name: Any) -> Optional[str]:
     if value:
         value = str(value).strip()
     return value or None
-
-
-def _parse_bool(value: Any, default: Optional[bool] = False) -> Optional[bool]:
-    if value is not None:
-        value = str(value).lower().strip()
-        if value:
-            if value in ("true", "1", "yes", "on"):
-                return True
-            elif value in ("false", "0", "no", "off"):
-                return False
-    return default

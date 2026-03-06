@@ -8,7 +8,7 @@ version = "0.0.4"
 description = "A simple, zero-dependency lazy-initialization logging utility"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["lfp-types>=0.0.4"]
 
 [dependency-groups]
 dev = ["pytest", "ruff", "bumpversion"]
@@ -20,6 +20,16 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "UP", "B", "SIM", "I"]
 ignore = []
+
+[tool.bumpversion]
+current_version = "0.0.4"
+commit = true
+tag = true
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
@@ -33,7 +43,10 @@ default = { solve-group = "default", features = ["dev"] }
 dev = { features = ["dev"], solve-group = "default" }
 
 
+
+
 [tool.pixi.tasks]
 ruff-fix = "ruff check . --fix --unsafe-fixes && ruff format ."
 publish = { cmd = "git add . && (git diff --staged --quiet || git commit -m \"pre-release: staging changes\") && bumpversion {{ part }} --message \"{{ message }}\" && git push origin HEAD --tags", args = [{ arg = "part", default = "patch" }, { arg = "message", default = "incrementing version to {new_version}" }], depends-on = ["ruff-fix"] }
+
 
