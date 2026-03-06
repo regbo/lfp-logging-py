@@ -931,8 +931,8 @@ packages:
   timestamp: 1770267209884
 - pypi: ./
   name: lfp-logging
-  version: 0.0.6
-  sha256: f95e5aa247712bf25f3ce6f08d9769247ec7f498d77929435e950c6b4400bc72
+  version: 0.0.7
+  sha256: 46fd73738a1780631c11d3e0f76aa2958cca53d9cb0a64879df29de38217d961
   requires_dist:
   - lfp-types>=0.0.4
   requires_python: '>=3.9'

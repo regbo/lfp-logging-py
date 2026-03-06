@@ -57,11 +57,17 @@ The logging level and formats can be controlled using environment variables.
 ### Environment Variables
 
 - `LOG_LEVEL`: Set the global log level. Accepts names (e.g., `DEBUG`, `INFO`) or numeric values (e.g., `10`, `20`).
-- `LOG_FORMAT`: Custom log format string (standard Python logging format).
+- `LOG_FORMAT`: Custom log format string (standard Python logging format). (Default: `%(asctime)s %(levelname)s %(name)s:%(lineno)d %(message)s`)
 - `LOG_FORMAT_DATE`: Custom date format (default: `%Y-%m-%d %H:%M:%S`).
-- `LOG_FORMAT_COLOR`: Global ANSI color code for all levels.
+- `LOG_FORMAT_COLOR`: Global ANSI color code for all levels (e.g., `\x1b[32m` for green).
 - `LOG_FORMAT_COLOR_<LEVEL>`: Level-specific ANSI color code (e.g., `LOG_FORMAT_COLOR_DEBUG`).
-- `LOG_CONFIG_LAZY`: Defer logging configuration until the first log message is emitted (default: `false`). Set to `true`, `1`, `yes`, or `on` to enable.
+- `LOG_CONFIG_LAZY`: Defer logging configuration until the first log message is emitted (default: `false`). Set to `true`, `1`, `yes`, or `on` to enable. When set to `false`, logging is configured immediately when `logger()` is called.
+
+### Automatic Back-off
+
+`lfp-logging` is designed to be non-intrusive:
+- **Pre-existing Config**: If you call `logging.basicConfig()` or otherwise configure the root logger *before* any `lfp-logging` activity, it will detect this and skip its own configuration.
+- **Post-initialization Override**: If you call `logging.basicConfig()` *after* `lfp-logging` has already configured itself, `lfp-logging` will automatically remove its default handler to allow your new configuration to take full effect.
 
 ### System Arguments
 
