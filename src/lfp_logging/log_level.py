@@ -17,6 +17,9 @@ class LogLevel:
     """
 
     def __init__(self, name: str, level: int) -> None:
+        """
+        Initializes the LogLevel with a name and integer level.
+        """
         self.name = name
         self.level = level
 
@@ -32,13 +35,14 @@ def get(value: Any, default_value: Union[str, int, None] = _UNSET) -> Union[LogL
     Converts a given value into a LogLevel object.
 
     Args:
-        value: The value to convert. Can be an integer, a string name, or
-            a numeric string.
+        value: The value to convert. Can be an integer, a string name,
+            a numeric string, or a logging.LogRecord.
         default_value: The value to return if parsing fails. If _UNSET (default),
             raises a ValueError on failure.
 
     Returns:
-        A LogLevel instance if conversion is successful.
+        A LogLevel instance if conversion is successful, or None if
+        default_value is explicitly None.
     """
     if value is not None:
         if isinstance(value, logging.LogRecord):

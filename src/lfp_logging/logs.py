@@ -38,7 +38,20 @@ class _InitContext(threading.Event):
         super().__init__()
         self._lock = threading.Lock()
 
-    def call(self, fn: Callable, *args, set: bool = True) -> bool:
+    def call(self, fn: Callable, *args: Any, set: bool = True) -> bool:
+        """
+        Executes the provided function with arguments if the event is not set.
+        Threads are synchronized via a lock to ensure the function is called
+        at most once.
+
+        Args:
+            fn: The function to execute.
+            *args: Arguments to pass to the function.
+            set: If True (default), sets the event after the function completes.
+
+        Returns:
+            True if the function was called, False otherwise.
+        """
         if not self.is_set():
             with self._lock:
                 if not self.is_set():
@@ -60,11 +73,19 @@ class _Formatter(logging.Formatter):
     based on the log level and terminal support.
     """
 
-    def __init__(self, stream: IO):
+    def __init__(self, stream: IO[str]):
+        """
+        Initializes the formatter with the target output stream to determine
+        color support.
+        """
         super().__init__(config.LOG_FORMAT.get(), config.LOG_FORMAT_DATE.get())
         self.stream = stream
 
     def format(self, record: logging.LogRecord) -> str:
+        """
+        Formats the log record into a string, optionally adding ANSI color codes
+        if supported by the target stream.
+        """
         message = super().format(record)
         color = config.color(self.stream, record)
         if color is None:
@@ -186,6 +207,9 @@ def _logging_basic_config_patch():
 def _create_logging_handler() -> logging.Handler:
     """
     Creates the default StreamHandler (stderr) with the custom color formatter.
+
+    Returns:
+        A logging.StreamHandler configured with a _Formatter pointing to stderr.
     """
     stream = sys.stderr
     handler = logging.StreamHandler(stream)

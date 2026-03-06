@@ -29,6 +29,9 @@ class _Config:
     parser: Callable[[Optional[str]], Any]
 
     def get(self) -> Any:
+        """
+        Retrieves and parses the current value of the environment variable.
+        """
         return self.parser(_env_value(self.env_name))
 
 
@@ -56,9 +59,16 @@ def color(stream: IO, record: logging.LogRecord) -> Optional[str]:
     Returns the ANSI color code for a given log record if the stream supports it.
 
     Color selection order:
-    1. `LOG_FORMAT_COLOR_<LEVEL>` environment variable.
-    2. `LOG_FORMAT_COLOR` environment variable.
+    1. `LOG_FORMAT_COLOR_<LEVEL>` environment variable (e.g., `LOG_FORMAT_COLOR_DEBUG`).
+    2. `LOG_FORMAT_COLOR` environment variable (global override).
     3. Default level-specific colors.
+
+    Args:
+        stream: The output stream (e.g., sys.stderr).
+        record: The logging record being formatted.
+
+    Returns:
+        The ANSI color escape code or None if colors are disabled or not found.
     """
     if not _supports_color(stream):
         return None
@@ -76,7 +86,14 @@ def color(stream: IO, record: logging.LogRecord) -> Optional[str]:
 def _supports_color(stream: IO) -> bool:
     """
     Determines if the given stream supports ANSI color output.
-    Checks for TTY status, IDE-specific environment variables, and OS capabilities.
+    Checks for TTY status, IDE-specific environment variables (VSCode, PyCharm),
+    CI environments, and OS capabilities.
+
+    Args:
+        stream: The stream to check for color support.
+
+    Returns:
+        True if the stream supports colors, False otherwise.
     """
     isatty = False
     try:
@@ -100,6 +117,10 @@ def _supports_color(stream: IO) -> bool:
 
 @cache
 def _os_supports_color() -> bool:
+    """
+    Internal check for OS-level color support based on TERM and other env vars.
+    Results are cached to avoid redundant environment lookups.
+    """
     term = _env_value("TERM")
     if term is None or term == "dumb":
         return False
@@ -133,6 +154,15 @@ def _os_supports_color() -> bool:
 
 
 def _env_value(name: Any) -> Optional[str]:
+    """
+    Retrieves and cleans an environment variable value.
+
+    Args:
+        name: The name of the environment variable.
+
+    Returns:
+        The stripped string value or None if not set or empty.
+    """
     value = os.environ.get(name, None)
     if value:
         value = str(value).strip()
