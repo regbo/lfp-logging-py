@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    if: ${{ vars.RUN_CI == 'true' }}
     name: Test on ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:
