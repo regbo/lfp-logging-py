@@ -13,6 +13,7 @@ A simple, zero-dependency logging utility for Python that provides lazy-initiali
 - **ANSI Colors**: Automatic color support for terminals, with overrides for popular IDEs (VSCode, PyCharm) and CI environments.
 - **Explicit Override Support**: If you call `logging.basicConfig()` yourself, `lfp-logging` will automatically back off and let your configuration take priority.
 - **Flexible Configuration**: Supports configuration via environment variables.
+- **Multi-platform Support**: Supports macOS (ARM/x64), Linux (ARM/x64), and Windows (x64/ARM).
 
 ## Installation
 

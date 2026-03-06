@@ -27,9 +27,7 @@ class LogLevel:
         return self.name
 
 
-def get(
-    value: Any, default_value: Union[str, int, None] = _UNSET
-) -> Union[LogLevel, None]:
+def get(value: Any, default_value: Union[str, int, None] = _UNSET) -> Union[LogLevel, None]:
     """
     Converts a given value into a LogLevel object.
 
@@ -48,11 +46,7 @@ def get(
         elif isinstance(value, int):
             level_no = value
             level_name = logging.getLevelName(level_no)
-            if (
-                isinstance(level_name, str)
-                and level_name
-                and not level_name.startswith("Level ")
-            ):
+            if isinstance(level_name, str) and level_name and not level_name.startswith("Level "):
                 return LogLevel(level_name, level_no)
         else:
             if level_name := str(value):

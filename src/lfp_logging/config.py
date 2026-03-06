@@ -108,9 +108,7 @@ def _os_supports_color() -> bool:
 
     if os.name == "nt":
         env = os.environ
-        return any(
-            k in env for k in ("WT_SESSION", "ANSICON", "ConEmuANSI", "TERM_PROGRAM")
-        )
+        return any(k in env for k in ("WT_SESSION", "ANSICON", "ConEmuANSI", "TERM_PROGRAM"))
 
     if _env_value("COLORTERM") is not None:
         return True

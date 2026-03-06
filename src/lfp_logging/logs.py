@@ -101,16 +101,10 @@ def logger(*names: Any) -> logging.Logger:
                 if (instance := caller_frame.f_locals.get("self", None)) is not None:
                     with contextlib.suppress(Exception):
                         name = _logger_name(instance.__class__.__name__)
-                if (
-                    not name
-                    and (cls := caller_frame.f_locals.get("cls", None)) is not None
-                ):
+                if not name and (cls := caller_frame.f_locals.get("cls", None)) is not None:
                     with contextlib.suppress(Exception):
                         name = _logger_name(cls.__name__)
-                if (
-                    not name
-                    and (co_filename := caller_frame.f_code.co_filename) is not None
-                ):
+                if not name and (co_filename := caller_frame.f_code.co_filename) is not None:
                     name = _logger_name(co_filename)
         finally:
             # Clean up frames to avoid reference cycles
@@ -225,8 +219,6 @@ def _logger_name(value: Any) -> Optional[str]:
             if path_name := path.stem:
                 if parent_name := path.parent.name if path.parent else None:
                     path_name = f"{parent_name}.{path_name}"
-                if path_name := "".join(
-                    c if c.isalnum() or c == "." else "_" for c in path_name
-                ):
+                if path_name := "".join(c if c.isalnum() or c == "." else "_" for c in path_name):
                     return path_name
     return name

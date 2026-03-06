@@ -208,4 +208,6 @@ __marimo__/
 
 
 .idea
-.python-version
+.python-version# pixi environments
+.pixi/*
+!.pixi/config.toml
