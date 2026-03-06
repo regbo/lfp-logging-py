@@ -11,7 +11,7 @@ requires-python = ">=3.9"
 dependencies = ["lfp-types>=0.0.4"]
 
 [dependency-groups]
-dev = ["pytest", "ruff", "bumpversion"]
+dev = ["pytest", "ruff", "bump-my-version"]
 
 [tool.ruff]
 target-version = "py39"
@@ -37,16 +37,16 @@ platforms = ["osx-arm64", "osx-64", "linux-64", "linux-aarch64", "win-64", "win-
 
 [tool.pixi.pypi-dependencies]
 lfp-logging = { path = ".", editable = true }
- 
+
 [tool.pixi.environments]
 default = { solve-group = "default", features = ["dev"] }
 dev = { features = ["dev"], solve-group = "default" }
 
-
-
-
 [tool.pixi.tasks]
 ruff-fix = "ruff check . --fix --unsafe-fixes && ruff format ."
-publish = { cmd = "git add . && (git diff --staged --quiet || git commit -m \"pre-release: staging changes\") && bumpversion {{ part }} --message \"{{ message }}\" && git push origin HEAD --tags", args = [{ arg = "part", default = "patch" }, { arg = "message", default = "incrementing version to {new_version}" }], depends-on = ["ruff-fix"] }
-
-
+publish = { cmd = "git add . && (git diff --staged --quiet || git commit -m \"pre-release: staging changes\") && bump-my-version bump {{ part }} --message \"{{ message }}\" && git push origin HEAD --tags", args = [
+    { arg = "part", default = "patch" },
+    { arg = "message", default = "incrementing version to {new_version}" },
+], depends-on = [
+    "ruff-fix",
+] }
