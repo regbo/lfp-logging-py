@@ -559,8 +559,8 @@ packages:
   timestamp: 1770267209884
 - pypi: ./
   name: lfp-logging
-  version: 0.0.2
-  sha256: 52fc7de2d0f59319374a3601ad5d272694e2fd43a3df7094477fd01ce48b9c84
+  version: 0.0.3
+  sha256: 1ed0471b1b2a81569183f8771964fd5a1ffa6537f833d35f46a3277323bf79f9
   requires_python: '>=3.9'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/libexpat-2.7.4-hecca717_0.conda
   sha256: d78f1d3bea8c031d2f032b760f36676d87929b18146351c4464c66b0869df3f5

@@ -67,7 +67,7 @@ def color(stream: IO, record: logging.LogRecord) -> Optional[str]:
     if ansi_color is None:
         ansi_color = _env_value(_LOG_FORMAT_COLOR_ENV_NAME)
     if ansi_color is None:
-        ansi_color = _LOG_LEVEL_COLORS.get(level_obj.name, None)
+        ansi_color = _LOG_LEVEL_COLORS.get(level_obj.name)
     return ansi_color
 
 
